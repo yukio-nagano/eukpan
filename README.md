@@ -29,6 +29,13 @@ EukPan performs the following steps:
       extract_representative_sequences.py
       extract_shared_accessory.py
 
+## Installation
+
+Download EukPan from GitHub:
+
+    git clone https://github.com/yukio-nagano/eukpan.git
+    cd eukpan
+
 ## Requirements
 
 Create a dedicated OrthoFinder environment:
