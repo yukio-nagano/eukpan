@@ -1,0 +1,57 @@
+# Output directories
+pangenome_results/
+results/
+output/
+logs/
+
+# Input data directories
+gff/
+genomes/
+assembled_genomes/
+proteins/
+proteomes/
+fixed_gff/
+longest_gff/
+
+# OrthoFinder outputs
+OrthoFinder/
+Results_*/
+
+# User-generated group/sample files
+GROUP_SAMPLES.txt
+
+# Temporary files
+*.log
+*.err
+*.tmp
+.DS_Store
+__pycache__/
+*.pyc
+
+# Biological data files
+*.fa
+*.faa
+*.fasta
+*.fna
+*.ffn
+*.gff
+*.gff3
+*.gtf
+*.gb
+*.gbk
+*.sam
+*.bam
+*.bai
+*.vcf
+*.gz
+*.zip
+*.tar
+*.tar.gz
+
+# Figures and analysis outputs
+*.png
+*.svg
+*.emf
+*.pdf
+*.tsv
+*.csv
