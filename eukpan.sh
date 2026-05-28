@@ -1087,15 +1087,15 @@ echo "First, prepare GROUP_SAMPLES.txt as a plain text file containing one sampl
 echo "The sample names must match the proteome FASTA basenames used in OrthoFinder."
 echo
 echo "Example GROUP_SAMPLES.txt:"
-echo "  BCC7051"
-echo "  BL18"
-echo "  CBS_466.91"
+echo "  sample1"
+echo "  sample2"
+echo "  sample3"
 echo
 echo "Example command to create GROUP_SAMPLES.txt:"
 echo "  cat > GROUP_SAMPLES.txt << 'EOF'"
-echo "  BCC7051"
-echo "  BL18"
-echo "  CBS_466.91"
+echo "  sample1"
+echo "  sample2"
+echo "  sample3"
 echo "  EOF"
 echo
 echo "Group-specific orthogroup extraction example:"
