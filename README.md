@@ -1,6 +1,6 @@
 # EukPan
 
-EukPan is a command-line pipeline for eukaryotic microbial pangenome analysis.
+EukPan is a command-line pipeline for eukaryotic pangenome analysis.
 
 It uses genome FASTA files and annotation files in GFF, GFF3, or GTF format to generate protein datasets, infer orthogroups, construct a concatenated single-copy core protein alignment, and analyze shared accessory genome presence/absence patterns.
 
