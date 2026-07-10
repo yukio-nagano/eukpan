@@ -11,9 +11,11 @@ import matplotlib.pyplot as plt
 
 from scipy.spatial.distance import pdist, squareform
 from scipy.cluster.hierarchy import linkage, dendrogram
+
 from matplotlib import gridspec
 from matplotlib.colors import ListedColormap
 from matplotlib.ticker import MaxNLocator
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 def parse_args():
@@ -40,10 +42,7 @@ def parse_args():
 
 def get_label_fontsize(n_samples: int) -> float:
     """
-    Automatically adjust sample-name font size.
-
-    Larger datasets need smaller labels, while smaller datasets should use
-    larger labels for readability.
+    Adaptive label font size for heatmaps and distance matrices.
     """
     if n_samples <= 10:
         return 12
@@ -62,7 +61,7 @@ def get_label_fontsize(n_samples: int) -> float:
 
 def get_dendrogram_fontsize(n_samples: int) -> float:
     """
-    Font size for dendrogram labels.
+    Adaptive label font size for dendrograms.
     """
     if n_samples <= 10:
         return 12
@@ -79,42 +78,49 @@ def get_dendrogram_fontsize(n_samples: int) -> float:
     return 4
 
 
-def get_heatmap_figsize(n_samples: int, n_rows: int):
+def get_heatmap_figsize(n_samples: int, n_orthogroups: int):
     """
-    Adaptive heatmap figure size.
+    Adaptive figure size for the presence/absence heatmap.
     """
     width = max(12, min(46, n_samples * 0.24))
-    height = max(8, min(32, n_rows * 0.012 + 6))
+    height = max(8, min(40, n_orthogroups * 0.012))
     return width, height
 
 
 def get_matrix_figsize(n_samples: int):
     """
-    Adaptive square figure size for the Jaccard distance matrix.
+    Adaptive figure size for the Jaccard distance matrix.
+
+    The matrix panel itself should be square.
+    Extra horizontal space is added for the colorbar.
     """
-    size = max(9, min(34, n_samples * 0.20))
-    return size, size
+    matrix_size = max(9, min(34, n_samples * 0.20))
+    return matrix_size + 2.0, matrix_size
 
 
 def get_dendrogram_figsize(n_samples: int):
     """
-    Adaptive figure size for dendrogram.
+    Adaptive figure size for the dendrogram.
     """
     width = max(12, min(46, n_samples * 0.24))
-    height = max(6, min(16, n_samples * 0.06 + 5))
-    return width, height
+    return width, 7
 
 
-def get_combined_figsize(n_samples: int, n_rows: int):
+def get_combined_figsize(n_samples: int, n_orthogroups: int):
     """
-    Adaptive figure size for combined dendrogram and heatmap.
+    Adaptive figure size for the combined dendrogram and heatmap.
     """
     width = max(14, min(50, n_samples * 0.26))
-    height = max(11, min(36, n_rows * 0.012 + 9))
+    height = max(10, min(44, n_orthogroups * 0.012 + 5))
     return width, height
 
 
 def save_png_and_emf(fig, png_path: Path, dpi: int = 300):
+    """
+    Save a matplotlib figure as PNG, SVG, and EMF if Inkscape is available.
+
+    EMF export is optional. If Inkscape is not installed, PNG and SVG are still saved.
+    """
     fig.savefig(png_path, dpi=dpi, bbox_inches="tight")
 
     svg_path = png_path.with_suffix(".svg")
@@ -135,12 +141,23 @@ def save_png_and_emf(fig, png_path: Path, dpi: int = 300):
             stderr=subprocess.DEVNULL,
         )
     except Exception as e:
-        print(f"WARNING: EMF export failed for {png_path.name}: {e}", file=sys.stderr)
+        print(
+            f"WARNING: EMF export failed for {png_path.name}: {e}",
+            file=sys.stderr
+        )
 
     plt.close(fig)
 
 
 def load_presence_absence_table(input_path: Path):
+    """
+    Load a shared accessory presence/absence table.
+
+    Expected columns:
+      Orthogroup, n_strains_present, category, strain1, strain2, ...
+
+    Strain columns must contain 0/1 values.
+    """
     df = pd.read_csv(input_path, sep="\t")
 
     required_cols = {"Orthogroup", "n_strains_present", "category"}
@@ -165,8 +182,12 @@ def load_presence_absence_table(input_path: Path):
 
 
 def save_summary(df: pd.DataFrame, pa: pd.DataFrame, strain_cols, outdir: Path):
+    """
+    Save a simple summary table.
+    """
     summary_rows = []
     summary_rows.append(["n_shared_accessory_orthogroups", len(df)])
+    summary_rows.append(["n_strains", len(strain_cols)])
 
     per_strain = pa.sum(axis=0)
     for strain, n in per_strain.items():
@@ -177,6 +198,9 @@ def save_summary(df: pd.DataFrame, pa: pd.DataFrame, strain_cols, outdir: Path):
 
 
 def save_distribution(df: pd.DataFrame, outdir: Path):
+    """
+    Save the distribution of the number of strains in which each orthogroup is present.
+    """
     dist = (
         df["n_strains_present"]
         .value_counts()
@@ -184,23 +208,18 @@ def save_distribution(df: pd.DataFrame, outdir: Path):
         .rename_axis("n_strains_present")
         .reset_index(name="n_orthogroups")
     )
+
     dist.to_csv(outdir / "01_presence_distribution.tsv", sep="\t", index=False)
 
-    fig = plt.figure(figsize=(8, 5))
-    ax = fig.add_subplot(111)
-
+    fig, ax = plt.subplots(figsize=(8, 5))
     ax.bar(
         dist["n_strains_present"],
         dist["n_orthogroups"],
-        color="black",
-        edgecolor="black",
-        linewidth=0.8
+        color="black"
     )
-
     ax.set_xlabel("Number of strains present")
     ax.set_ylabel("Number of shared accessory orthogroups")
     ax.set_title("Distribution of shared accessory orthogroups")
-
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
     plt.tight_layout()
@@ -208,6 +227,12 @@ def save_distribution(df: pd.DataFrame, outdir: Path):
 
 
 def compute_jaccard(pa: pd.DataFrame):
+    """
+    Compute pairwise Jaccard distances and similarities among strains.
+
+    Rows of the input matrix are orthogroups and columns are strains.
+    The matrix is transposed so that rows represent strains.
+    """
     strain_matrix = pa.T.values
     dist_vec = pdist(strain_matrix, metric="jaccard")
     dist_mat = squareform(dist_vec)
@@ -216,6 +241,9 @@ def compute_jaccard(pa: pd.DataFrame):
 
 
 def compute_clustering(dist_mat, strain_cols):
+    """
+    Perform average-linkage hierarchical clustering using Jaccard distances.
+    """
     dist_vec = squareform(dist_mat, checks=False)
     Z = linkage(dist_vec, method="average", optimal_ordering=True)
 
@@ -226,7 +254,15 @@ def compute_clustering(dist_mat, strain_cols):
 
 
 def reorder_rows_for_heatmap(pa_ord: pd.DataFrame):
+    """
+    Reorder orthogroup rows for the heatmap.
+
+    Rows are sorted by:
+      1. Number of strains in which the orthogroup is present
+      2. Binary presence/absence pattern
+    """
     row_patterns = pa_ord.astype(str).agg("".join, axis=1)
+
     tmp = pd.DataFrame({
         "row_index": np.arange(pa_ord.shape[0]),
         "presence_sum": pa_ord.sum(axis=1).values,
@@ -243,6 +279,12 @@ def reorder_rows_for_heatmap(pa_ord: pd.DataFrame):
 
 
 def save_distance_matrix(dist_mat, strain_cols, ordered_cols, outdir: Path):
+    """
+    Save Jaccard distance and similarity matrices.
+
+    The plotted reordered distance matrix is drawn so that the matrix panel itself
+    is square. The colorbar is placed outside the matrix panel.
+    """
     n_samples = len(strain_cols)
     label_fontsize = get_label_fontsize(n_samples)
 
@@ -263,19 +305,29 @@ def save_distance_matrix(dist_mat, strain_cols, ordered_cols, outdir: Path):
 
     im = ax.imshow(
         dist_df_ord.values,
-        aspect="auto",
+        aspect="equal",
         interpolation="nearest",
         cmap="viridis"
     )
 
-    cbar = fig.colorbar(im, ax=ax)
+    ax.set_adjustable("box")
+
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="4%", pad=0.15)
+    cbar = fig.colorbar(im, cax=cax)
     cbar.set_label("Jaccard distance")
 
     ax.set_xticks(range(len(ordered_cols)))
-    ax.set_xticklabels(ordered_cols, rotation=90, fontsize=label_fontsize)
-
+    ax.set_xticklabels(
+        ordered_cols,
+        rotation=90,
+        fontsize=label_fontsize
+    )
     ax.set_yticks(range(len(ordered_cols)))
-    ax.set_yticklabels(ordered_cols, fontsize=label_fontsize)
+    ax.set_yticklabels(
+        ordered_cols,
+        fontsize=label_fontsize
+    )
 
     ax.set_title("Jaccard distance matrix (reordered by dendrogram)")
 
@@ -286,6 +338,9 @@ def save_distance_matrix(dist_mat, strain_cols, ordered_cols, outdir: Path):
 
 
 def save_clustering(Z, strain_cols, outdir: Path):
+    """
+    Save a hierarchical clustering dendrogram.
+    """
     n_samples = len(strain_cols)
     dendro_fontsize = get_dendrogram_fontsize(n_samples)
 
@@ -297,32 +352,31 @@ def save_clustering(Z, strain_cols, outdir: Path):
         labels=strain_cols,
         leaf_rotation=90,
         leaf_font_size=dendro_fontsize,
-        color_threshold=0,
-        above_threshold_color="black",
-        link_color_func=lambda k: "black",
         ax=ax
     )
 
     ax.set_ylabel("Jaccard distance")
     ax.set_title("Hierarchical clustering based on shared accessory orthogroups")
 
-    for spine in ax.spines.values():
-        spine.set_color("black")
-
     plt.tight_layout()
     save_png_and_emf(fig, outdir / "04_hierarchical_clustering.png")
 
 
 def save_heatmap(pa: pd.DataFrame, ordered_cols, outdir: Path):
+    """
+    Save a reordered binary presence/absence heatmap.
+    """
     n_samples = len(ordered_cols)
-    label_fontsize = get_label_fontsize(n_samples)
 
     pa_ord = pa[ordered_cols].copy()
     pa_ord = reorder_rows_for_heatmap(pa_ord)
 
+    n_orthogroups = pa_ord.shape[0]
+    label_fontsize = get_label_fontsize(n_samples)
+
     cmap = ListedColormap(["white", "black"])
 
-    fig = plt.figure(figsize=get_heatmap_figsize(n_samples, pa_ord.shape[0]))
+    fig = plt.figure(figsize=get_heatmap_figsize(n_samples, n_orthogroups))
     ax = fig.add_subplot(111)
 
     ax.imshow(
@@ -335,12 +389,16 @@ def save_heatmap(pa: pd.DataFrame, ordered_cols, outdir: Path):
     )
 
     ax.set_xticks(range(len(ordered_cols)))
-    ax.set_xticklabels(ordered_cols, rotation=90, fontsize=label_fontsize)
-
+    ax.set_xticklabels(
+        ordered_cols,
+        rotation=90,
+        fontsize=label_fontsize
+    )
     ax.set_yticks([])
+
     ax.set_xlabel("Strains")
     ax.set_ylabel("Shared accessory orthogroups")
-    ax.set_title("Presence/Absence heatmap of shared accessory orthogroups")
+    ax.set_title("Presence/absence heatmap of shared accessory orthogroups")
 
     plt.tight_layout()
     save_png_and_emf(fig, outdir / "02_presence_absence_heatmap_reordered.png")
@@ -349,7 +407,12 @@ def save_heatmap(pa: pd.DataFrame, ordered_cols, outdir: Path):
 
 
 def save_combined_dendrogram_heatmap(Z, pa_ord: pd.DataFrame, strain_cols, outdir: Path):
+    """
+    Save a combined dendrogram and presence/absence heatmap.
+    """
     n_samples = len(strain_cols)
+    n_orthogroups = pa_ord.shape[0]
+
     label_fontsize = get_label_fontsize(n_samples)
     dendro_fontsize = get_dendrogram_fontsize(n_samples)
 
@@ -360,7 +423,7 @@ def save_combined_dendrogram_heatmap(Z, pa_ord: pd.DataFrame, strain_cols, outdi
 
     cmap = ListedColormap(["white", "black"])
 
-    fig = plt.figure(figsize=get_combined_figsize(n_samples, pa_for_plot.shape[0]))
+    fig = plt.figure(figsize=get_combined_figsize(n_samples, n_orthogroups))
     gs = gridspec.GridSpec(
         nrows=2,
         ncols=1,
@@ -374,17 +437,11 @@ def save_combined_dendrogram_heatmap(Z, pa_ord: pd.DataFrame, strain_cols, outdi
         labels=strain_cols,
         leaf_rotation=90,
         leaf_font_size=dendro_fontsize,
-        color_threshold=0,
-        above_threshold_color="black",
-        link_color_func=lambda k: "black",
         ax=ax_d
     )
     ax_d.set_ylabel("Jaccard distance")
     ax_d.set_title("Dendrogram and presence/absence heatmap")
     ax_d.tick_params(axis="x", which="both", bottom=False, labelbottom=False)
-
-    for spine in ax_d.spines.values():
-        spine.set_color("black")
 
     ax_h = fig.add_subplot(gs[1, 0])
     ax_h.imshow(
@@ -397,21 +454,23 @@ def save_combined_dendrogram_heatmap(Z, pa_ord: pd.DataFrame, strain_cols, outdi
     )
 
     ax_h.set_xticks(range(len(dendro_order)))
-    ax_h.set_xticklabels(dendro_order, rotation=90, fontsize=label_fontsize)
+    ax_h.set_xticklabels(
+        dendro_order,
+        rotation=90,
+        fontsize=label_fontsize
+    )
     ax_h.set_yticks([])
+
     ax_h.set_xlabel("Strains")
     ax_h.set_ylabel("Shared accessory orthogroups")
 
-    for spine in ax_h.spines.values():
-        spine.set_color("black")
-
     fig.subplots_adjust(hspace=0.05)
-
     save_png_and_emf(fig, outdir / "05_dendrogram_heatmap_combined.png")
 
 
 def main():
     args = parse_args()
+
     input_path = Path(args.input)
     outdir = Path(args.outdir)
 
@@ -429,8 +488,11 @@ def main():
     dist_mat, sim_mat = compute_jaccard(pa)
     Z, ordered_cols = compute_clustering(dist_mat, strain_cols)
 
-    dist_df, sim_df, dist_df_ord, sim_df_ord = save_distance_matrix(
-        dist_mat, strain_cols, ordered_cols, outdir
+    save_distance_matrix(
+        dist_mat,
+        strain_cols,
+        ordered_cols,
+        outdir
     )
 
     save_clustering(Z, strain_cols, outdir)
