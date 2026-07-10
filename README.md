@@ -19,6 +19,7 @@ EukPan performs the following steps:
 9. Concatenates single-copy core protein alignments
 10. Extracts shared accessory orthogroups
 11. Visualizes accessory genome presence/absence patterns
+12. Provides optional downstream scripts for group-specific orthogroup extraction, representative sequence extraction, and PCA of accessory genome presence/absence profiles
 
 ## Repository structure
 
@@ -28,6 +29,7 @@ EukPan performs the following steps:
       extract_group_presence_absence.py
       extract_representative_sequences.py
       extract_shared_accessory.py
+      pca_accessory_presence_absence.py
 
 ## Installation
 
@@ -66,6 +68,15 @@ Optional: install Inkscape for EMF export.
 
     sudo apt update
     sudo apt install inkscape
+
+Optional: install R and ggplot2 for PCA visualization.
+
+    sudo apt update
+    sudo apt install r-base
+
+Then, in R:
+
+    install.packages("ggplot2")
 
 ## Input
 
@@ -158,6 +169,8 @@ Main figures:
     04_hierarchical_clustering.png
     05_dendrogram_heatmap_combined.png
 
+The reordered Jaccard distance matrix is drawn so that the matrix panel itself is square, with the color scale placed outside the matrix.
+
 ## Group-specific orthogroup analysis
 
 Prepare GROUP_SAMPLES.txt with one sample name per line.
@@ -190,6 +203,49 @@ After group-specific orthogroup extraction, representative sequences can be extr
       -s pangenome_results/proteomes/OrthoFinder/Results_*/Orthogroup_Sequences \
       -o group_biased_representatives.fa
 
+## PCA of accessory orthogroup presence/absence profiles
+
+EukPan also provides an optional script for principal component analysis of shared accessory orthogroup presence/absence profiles.
+
+This script is independent of the main pipeline and can be run after EukPan has generated:
+
+    pangenome_results/accessory_results/shared_accessory_presence_absence.tsv
+
+Run PCA without group labels:
+
+    python scripts/pca_accessory_presence_absence.py \
+      -i pangenome_results/accessory_results/shared_accessory_presence_absence.tsv \
+      -o pangenome_results/accessory_pca
+
+Run PCA with group labels:
+
+    python scripts/pca_accessory_presence_absence.py \
+      -i pangenome_results/accessory_results/shared_accessory_presence_absence.tsv \
+      -o pangenome_results/accessory_pca \
+      -g GROUP_SAMPLES.txt \
+      --group-name Group_A \
+      --nongroup-name Non_group_A
+
+The PCA script generates R-ready output files:
+
+    pangenome_results/accessory_pca/accessory_pca_scores.tsv
+    pangenome_results/accessory_pca/accessory_pca_loadings.tsv
+    pangenome_results/accessory_pca/accessory_pca_variance.tsv
+    pangenome_results/accessory_pca/accessory_pca_metadata.tsv
+    pangenome_results/accessory_pca/accessory_presence_absence_matrix_for_R.tsv
+    pangenome_results/accessory_pca/accessory_pca_used_orthogroups.tsv
+    pangenome_results/accessory_pca/plot_accessory_pca.R
+
+To visualize the PCA in R:
+
+    cd pangenome_results/accessory_pca
+    Rscript plot_accessory_pca.R
+
+This generates:
+
+    accessory_pca_PC1_PC2.pdf
+    accessory_pca_PC1_PC2.png
+
 ## Notes
 
 No example genome or annotation data are included in this repository.
@@ -197,6 +253,8 @@ No example genome or annotation data are included in this repository.
 Users should prepare their own genome FASTA and annotation files.
 
 If annotation files are not available, they may be generated using appropriate gene prediction tools, including ANNEVO for fungal genomes.
+
+The PCA script is intended as an optional downstream analysis. It does not change the main EukPan pipeline output.
 
 ## License
 
