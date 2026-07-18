@@ -465,6 +465,9 @@ def save_distance_matrix(dist_mat, strain_cols, ordered_cols, outdir: Path, args
 def save_clustering(Z, strain_cols, outdir: Path, args):
     """
     Save a hierarchical clustering dendrogram.
+
+    Dendrogram branches are forced to black for publication-style
+    monochrome output.
     """
     n_samples = len(strain_cols)
 
@@ -481,6 +484,9 @@ def save_clustering(Z, strain_cols, outdir: Path, args):
         labels=strain_cols,
         leaf_rotation=90,
         leaf_font_size=dendro_fontsize,
+        color_threshold=0,
+        above_threshold_color="black",
+        link_color_func=lambda k: "black",
         ax=ax
     )
 
@@ -545,6 +551,9 @@ def save_heatmap(pa: pd.DataFrame, ordered_cols, outdir: Path, args):
 def save_combined_dendrogram_heatmap(Z, pa_ord: pd.DataFrame, strain_cols, outdir: Path, args):
     """
     Save a combined dendrogram and presence/absence heatmap.
+
+    Dendrogram branches are forced to black for publication-style
+    monochrome output.
     """
     n_samples = len(strain_cols)
     n_orthogroups = pa_ord.shape[0]
@@ -580,6 +589,9 @@ def save_combined_dendrogram_heatmap(Z, pa_ord: pd.DataFrame, strain_cols, outdi
         labels=strain_cols,
         leaf_rotation=90,
         leaf_font_size=dendro_fontsize,
+        color_threshold=0,
+        above_threshold_color="black",
+        link_color_func=lambda k: "black",
         ax=ax_d
     )
     set_ylabel(ax_d, "Jaccard distance", args.axis_fontsize)
