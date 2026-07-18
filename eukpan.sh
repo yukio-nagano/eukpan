@@ -1118,4 +1118,21 @@ echo "    -s $OG_SEQ_DIR \\"
 echo "    -o group_biased_representatives.fa"
 
 echo
+echo "Accessory orthogroup PCA example:"
+echo "  python3 $SCRIPTS_DIR/pca_accessory_presence_absence.py \\"
+echo "    -i $OUTDIR/accessory_results/shared_accessory_presence_absence.tsv \\"
+echo "    -o $OUTDIR/accessory_pca \\"
+echo "    -g GROUP_SAMPLES.txt \\"
+echo "    --group-name Group_A \\"
+echo "    --nongroup-name Non_group_A"
+echo
+echo "This optional analysis performs PCA using the shared accessory orthogroup presence/absence matrix."
+echo "It creates R-ready output files in:"
+echo "  $OUTDIR/accessory_pca"
+echo
+echo "To visualize the PCA in R, run:"
+echo "  cd $OUTDIR/accessory_pca"
+echo "  Rscript plot_accessory_pca.R"
+
+echo
 echo "Done."

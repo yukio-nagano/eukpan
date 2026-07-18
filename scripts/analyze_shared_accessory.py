@@ -27,6 +27,7 @@ def parse_args():
             "where strain columns are 0/1."
         )
     )
+
     parser.add_argument(
         "-i", "--input",
         required=True,
@@ -37,6 +38,84 @@ def parse_args():
         required=True,
         help="Output directory"
     )
+
+    # Optional font-size controls.
+    # These are intended for standalone use of this script.
+    # If not specified, the original automatic font-size behavior is used.
+    parser.add_argument(
+        "--label-fontsize",
+        type=float,
+        default=None,
+        help=(
+            "Override sample-name label font size for heatmaps and distance matrix. "
+            "Default: automatic."
+        )
+    )
+    parser.add_argument(
+        "--distance-label-fontsize",
+        type=float,
+        default=None,
+        help=(
+            "Override sample-name label font size only for "
+            "03_jaccard_distance_matrix_reordered. Default: automatic."
+        )
+    )
+    parser.add_argument(
+        "--heatmap-label-fontsize",
+        type=float,
+        default=None,
+        help=(
+            "Override sample-name label font size only for "
+            "02_presence_absence_heatmap_reordered. Default: automatic."
+        )
+    )
+    parser.add_argument(
+        "--combined-label-fontsize",
+        type=float,
+        default=None,
+        help=(
+            "Override sample-name label font size only for "
+            "05_dendrogram_heatmap_combined. Default: automatic."
+        )
+    )
+    parser.add_argument(
+        "--dendrogram-fontsize",
+        type=float,
+        default=None,
+        help=(
+            "Override dendrogram leaf label font size for "
+            "04_hierarchical_clustering and the dendrogram in "
+            "05_dendrogram_heatmap_combined. Default: automatic."
+        )
+    )
+    parser.add_argument(
+        "--title-fontsize",
+        type=float,
+        default=None,
+        help="Override plot title font size. Default: matplotlib default."
+    )
+    parser.add_argument(
+        "--axis-fontsize",
+        type=float,
+        default=None,
+        help="Override axis label font size. Default: matplotlib default."
+    )
+    parser.add_argument(
+        "--tick-fontsize",
+        type=float,
+        default=None,
+        help=(
+            "Override general tick label font size, except sample labels when "
+            "more specific label-size options are used. Default: matplotlib default."
+        )
+    )
+    parser.add_argument(
+        "--colorbar-fontsize",
+        type=float,
+        default=None,
+        help="Override colorbar label and tick font size. Default: matplotlib default."
+    )
+
     return parser.parse_args()
 
 
@@ -113,6 +192,40 @@ def get_combined_figsize(n_samples: int, n_orthogroups: int):
     width = max(14, min(50, n_samples * 0.26))
     height = max(10, min(44, n_orthogroups * 0.012 + 5))
     return width, height
+
+
+def choose_fontsize(user_value, fallback_value):
+    """
+    Use a user-specified font size if provided.
+    Otherwise, use the fallback value.
+    """
+    return user_value if user_value is not None else fallback_value
+
+
+def set_title(ax, title, fontsize=None):
+    if fontsize is None:
+        ax.set_title(title)
+    else:
+        ax.set_title(title, fontsize=fontsize)
+
+
+def set_xlabel(ax, label, fontsize=None):
+    if fontsize is None:
+        ax.set_xlabel(label)
+    else:
+        ax.set_xlabel(label, fontsize=fontsize)
+
+
+def set_ylabel(ax, label, fontsize=None):
+    if fontsize is None:
+        ax.set_ylabel(label)
+    else:
+        ax.set_ylabel(label, fontsize=fontsize)
+
+
+def apply_tick_fontsize(ax, tick_fontsize=None):
+    if tick_fontsize is not None:
+        ax.tick_params(axis="both", labelsize=tick_fontsize)
 
 
 def save_png_and_emf(fig, png_path: Path, dpi: int = 300):
@@ -197,7 +310,7 @@ def save_summary(df: pd.DataFrame, pa: pd.DataFrame, strain_cols, outdir: Path):
     summary_df.to_csv(outdir / "00_summary.tsv", sep="\t", index=False)
 
 
-def save_distribution(df: pd.DataFrame, outdir: Path):
+def save_distribution(df: pd.DataFrame, outdir: Path, args):
     """
     Save the distribution of the number of strains in which each orthogroup is present.
     """
@@ -217,10 +330,13 @@ def save_distribution(df: pd.DataFrame, outdir: Path):
         dist["n_orthogroups"],
         color="black"
     )
-    ax.set_xlabel("Number of strains present")
-    ax.set_ylabel("Number of shared accessory orthogroups")
-    ax.set_title("Distribution of shared accessory orthogroups")
+
+    set_xlabel(ax, "Number of strains present", args.axis_fontsize)
+    set_ylabel(ax, "Number of shared accessory orthogroups", args.axis_fontsize)
+    set_title(ax, "Distribution of shared accessory orthogroups", args.title_fontsize)
+
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    apply_tick_fontsize(ax, args.tick_fontsize)
 
     plt.tight_layout()
     save_png_and_emf(fig, outdir / "01_presence_distribution.png")
@@ -278,7 +394,7 @@ def reorder_rows_for_heatmap(pa_ord: pd.DataFrame):
     return pa_ord.iloc[tmp["row_index"].values]
 
 
-def save_distance_matrix(dist_mat, strain_cols, ordered_cols, outdir: Path):
+def save_distance_matrix(dist_mat, strain_cols, ordered_cols, outdir: Path, args):
     """
     Save Jaccard distance and similarity matrices.
 
@@ -286,7 +402,11 @@ def save_distance_matrix(dist_mat, strain_cols, ordered_cols, outdir: Path):
     is square. The colorbar is placed outside the matrix panel.
     """
     n_samples = len(strain_cols)
-    label_fontsize = get_label_fontsize(n_samples)
+
+    label_fontsize = choose_fontsize(
+        args.distance_label_fontsize,
+        choose_fontsize(args.label_fontsize, get_label_fontsize(n_samples))
+    )
 
     dist_df = pd.DataFrame(dist_mat, index=strain_cols, columns=strain_cols)
     sim_df = 1.0 - dist_df
@@ -315,7 +435,12 @@ def save_distance_matrix(dist_mat, strain_cols, ordered_cols, outdir: Path):
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="4%", pad=0.15)
     cbar = fig.colorbar(im, cax=cax)
-    cbar.set_label("Jaccard distance")
+
+    if args.colorbar_fontsize is None:
+        cbar.set_label("Jaccard distance")
+    else:
+        cbar.set_label("Jaccard distance", fontsize=args.colorbar_fontsize)
+        cbar.ax.tick_params(labelsize=args.colorbar_fontsize)
 
     ax.set_xticks(range(len(ordered_cols)))
     ax.set_xticklabels(
@@ -329,7 +454,7 @@ def save_distance_matrix(dist_mat, strain_cols, ordered_cols, outdir: Path):
         fontsize=label_fontsize
     )
 
-    ax.set_title("Jaccard distance matrix (reordered by dendrogram)")
+    set_title(ax, "Jaccard distance matrix (reordered by dendrogram)", args.title_fontsize)
 
     plt.tight_layout()
     save_png_and_emf(fig, outdir / "03_jaccard_distance_matrix_reordered.png")
@@ -337,12 +462,16 @@ def save_distance_matrix(dist_mat, strain_cols, ordered_cols, outdir: Path):
     return dist_df, sim_df, dist_df_ord, sim_df_ord
 
 
-def save_clustering(Z, strain_cols, outdir: Path):
+def save_clustering(Z, strain_cols, outdir: Path, args):
     """
     Save a hierarchical clustering dendrogram.
     """
     n_samples = len(strain_cols)
-    dendro_fontsize = get_dendrogram_fontsize(n_samples)
+
+    dendro_fontsize = choose_fontsize(
+        args.dendrogram_fontsize,
+        get_dendrogram_fontsize(n_samples)
+    )
 
     fig = plt.figure(figsize=get_dendrogram_figsize(n_samples))
     ax = fig.add_subplot(111)
@@ -355,14 +484,17 @@ def save_clustering(Z, strain_cols, outdir: Path):
         ax=ax
     )
 
-    ax.set_ylabel("Jaccard distance")
-    ax.set_title("Hierarchical clustering based on shared accessory orthogroups")
+    set_ylabel(ax, "Jaccard distance", args.axis_fontsize)
+    set_title(ax, "Hierarchical clustering based on shared accessory orthogroups", args.title_fontsize)
+
+    if args.tick_fontsize is not None:
+        ax.tick_params(axis="y", labelsize=args.tick_fontsize)
 
     plt.tight_layout()
     save_png_and_emf(fig, outdir / "04_hierarchical_clustering.png")
 
 
-def save_heatmap(pa: pd.DataFrame, ordered_cols, outdir: Path):
+def save_heatmap(pa: pd.DataFrame, ordered_cols, outdir: Path, args):
     """
     Save a reordered binary presence/absence heatmap.
     """
@@ -372,7 +504,11 @@ def save_heatmap(pa: pd.DataFrame, ordered_cols, outdir: Path):
     pa_ord = reorder_rows_for_heatmap(pa_ord)
 
     n_orthogroups = pa_ord.shape[0]
-    label_fontsize = get_label_fontsize(n_samples)
+
+    label_fontsize = choose_fontsize(
+        args.heatmap_label_fontsize,
+        choose_fontsize(args.label_fontsize, get_label_fontsize(n_samples))
+    )
 
     cmap = ListedColormap(["white", "black"])
 
@@ -396,9 +532,9 @@ def save_heatmap(pa: pd.DataFrame, ordered_cols, outdir: Path):
     )
     ax.set_yticks([])
 
-    ax.set_xlabel("Strains")
-    ax.set_ylabel("Shared accessory orthogroups")
-    ax.set_title("Presence/absence heatmap of shared accessory orthogroups")
+    set_xlabel(ax, "Strains", args.axis_fontsize)
+    set_ylabel(ax, "Shared accessory orthogroups", args.axis_fontsize)
+    set_title(ax, "Presence/absence heatmap of shared accessory orthogroups", args.title_fontsize)
 
     plt.tight_layout()
     save_png_and_emf(fig, outdir / "02_presence_absence_heatmap_reordered.png")
@@ -406,15 +542,22 @@ def save_heatmap(pa: pd.DataFrame, ordered_cols, outdir: Path):
     return pa_ord
 
 
-def save_combined_dendrogram_heatmap(Z, pa_ord: pd.DataFrame, strain_cols, outdir: Path):
+def save_combined_dendrogram_heatmap(Z, pa_ord: pd.DataFrame, strain_cols, outdir: Path, args):
     """
     Save a combined dendrogram and presence/absence heatmap.
     """
     n_samples = len(strain_cols)
     n_orthogroups = pa_ord.shape[0]
 
-    label_fontsize = get_label_fontsize(n_samples)
-    dendro_fontsize = get_dendrogram_fontsize(n_samples)
+    label_fontsize = choose_fontsize(
+        args.combined_label_fontsize,
+        choose_fontsize(args.label_fontsize, get_label_fontsize(n_samples))
+    )
+
+    dendro_fontsize = choose_fontsize(
+        args.dendrogram_fontsize,
+        get_dendrogram_fontsize(n_samples)
+    )
 
     d = dendrogram(Z, labels=strain_cols, no_plot=True)
     dendro_order = d["ivl"]
@@ -439,9 +582,12 @@ def save_combined_dendrogram_heatmap(Z, pa_ord: pd.DataFrame, strain_cols, outdi
         leaf_font_size=dendro_fontsize,
         ax=ax_d
     )
-    ax_d.set_ylabel("Jaccard distance")
-    ax_d.set_title("Dendrogram and presence/absence heatmap")
+    set_ylabel(ax_d, "Jaccard distance", args.axis_fontsize)
+    set_title(ax_d, "Dendrogram and presence/absence heatmap", args.title_fontsize)
     ax_d.tick_params(axis="x", which="both", bottom=False, labelbottom=False)
+
+    if args.tick_fontsize is not None:
+        ax_d.tick_params(axis="y", labelsize=args.tick_fontsize)
 
     ax_h = fig.add_subplot(gs[1, 0])
     ax_h.imshow(
@@ -461,8 +607,8 @@ def save_combined_dendrogram_heatmap(Z, pa_ord: pd.DataFrame, strain_cols, outdi
     )
     ax_h.set_yticks([])
 
-    ax_h.set_xlabel("Strains")
-    ax_h.set_ylabel("Shared accessory orthogroups")
+    set_xlabel(ax_h, "Strains", args.axis_fontsize)
+    set_ylabel(ax_h, "Shared accessory orthogroups", args.axis_fontsize)
 
     fig.subplots_adjust(hspace=0.05)
     save_png_and_emf(fig, outdir / "05_dendrogram_heatmap_combined.png")
@@ -483,7 +629,7 @@ def main():
     df, pa, strain_cols = load_presence_absence_table(input_path)
 
     save_summary(df, pa, strain_cols, outdir)
-    save_distribution(df, outdir)
+    save_distribution(df, outdir, args)
 
     dist_mat, sim_mat = compute_jaccard(pa)
     Z, ordered_cols = compute_clustering(dist_mat, strain_cols)
@@ -492,17 +638,33 @@ def main():
         dist_mat,
         strain_cols,
         ordered_cols,
-        outdir
+        outdir,
+        args
     )
 
-    save_clustering(Z, strain_cols, outdir)
+    save_clustering(Z, strain_cols, outdir, args)
 
-    pa_ord = save_heatmap(pa, ordered_cols, outdir)
-    save_combined_dendrogram_heatmap(Z, pa_ord, strain_cols, outdir)
+    pa_ord = save_heatmap(pa, ordered_cols, outdir, args)
+    save_combined_dendrogram_heatmap(Z, pa_ord, strain_cols, outdir, args)
 
     sys.stderr.write("Finished.\n")
     sys.stderr.write(f"Input: {input_path}\n")
     sys.stderr.write(f"Output directory: {outdir}\n")
+
+    if any([
+        args.label_fontsize is not None,
+        args.distance_label_fontsize is not None,
+        args.heatmap_label_fontsize is not None,
+        args.combined_label_fontsize is not None,
+        args.dendrogram_fontsize is not None,
+        args.title_fontsize is not None,
+        args.axis_fontsize is not None,
+        args.tick_fontsize is not None,
+        args.colorbar_fontsize is not None,
+    ]):
+        sys.stderr.write("\n")
+        sys.stderr.write("Custom font-size options were used for this standalone run.\n")
+        sys.stderr.write("Running eukpan.sh without these options keeps the default behavior.\n")
 
 
 if __name__ == "__main__":

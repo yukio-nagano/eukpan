@@ -171,6 +171,47 @@ Main figures:
 
 The reordered Jaccard distance matrix is drawn so that the matrix panel itself is square, with the color scale placed outside the matrix.
 
+### Custom font-size control for standalone visualization
+
+The accessory visualization script can also be run independently after EukPan has generated:
+
+    pangenome_results/accessory_results/shared_accessory_presence_absence.tsv
+
+By default, EukPan automatically adjusts sample-name font sizes according to the number of strains.
+
+If the figures are regenerated manually, font sizes can be adjusted using optional arguments. These options affect only the standalone execution of `analyze_shared_accessory.py`. They do not change the default behavior of the main `eukpan.sh` pipeline.
+
+Example:
+
+    python scripts/analyze_shared_accessory.py \
+      -i pangenome_results/accessory_results/shared_accessory_presence_absence.tsv \
+      -o pangenome_results/accessory_analysis_custom_font \
+      --label-fontsize 6 \
+      --dendrogram-fontsize 5 \
+      --title-fontsize 12 \
+      --axis-fontsize 10 \
+      --colorbar-fontsize 9
+
+More specific options can be used to adjust individual figures:
+
+    --distance-label-fontsize
+    --heatmap-label-fontsize
+    --combined-label-fontsize
+    --dendrogram-fontsize
+    --title-fontsize
+    --axis-fontsize
+    --tick-fontsize
+    --colorbar-fontsize
+
+For example, to make only the sample names in the reordered Jaccard distance matrix smaller:
+
+    python scripts/analyze_shared_accessory.py \
+      -i pangenome_results/accessory_results/shared_accessory_presence_absence.tsv \
+      -o pangenome_results/accessory_analysis_custom_font \
+      --distance-label-fontsize 4.5
+
+The output files are the same as the standard accessory visualization outputs, but they are written to the user-specified output directory.
+
 ## Group-specific orthogroup analysis
 
 Prepare GROUP_SAMPLES.txt with one sample name per line.
