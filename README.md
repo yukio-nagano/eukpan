@@ -385,3 +385,18 @@ The PCA script is intended as an optional downstream analysis. It does not chang
 ## License
 
 This project is released under the MIT License.
+
+## Citation
+
+If you use EukPan in your research, please cite the following preprint:
+
+Seki, K., Goto, M., Futagami, T., & Nagano, Y. (2026).
+The automated eukaryotic pangenome pipeline EukPan reveals accessory
+genome differentiation beyond core-gene phylogeny in *Aspergillus oryzae*.
+bioRxiv [Preprint].
+https://doi.org/10.64898/2026.09.13.751290
+
+Please also cite the archived software version used in your analysis:
+
+EukPan v0.1.0.
+Zenodo. https://doi.org/10.5281/zenodo.22093294
